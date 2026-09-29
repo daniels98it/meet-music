@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Meet Music",
+  "version": "0.2.0",
+  "description": "Mix a looping MP3 into your microphone on Google Meet.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["https://meet.google.com/*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Meet Music",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    { "matches": ["https://meet.google.com/*"], "js": ["inject.js"],
+      "world": "MAIN", "run_at": "document_start" },
+    { "matches": ["https://meet.google.com/*"], "js": ["tracks.js", "content.js"],
+      "world": "ISOLATED", "run_at": "document_idle" }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["music/*.mp3"], "matches": ["https://meet.google.com/*"] }
+  ]
+}

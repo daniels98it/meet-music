@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Meet Music</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fff;
+        --fg: #202124;
+        --muted: #5f6368;
+        --line: #dadce0;
+        --field: #fff;
+        --accent: #1a73e8;
+        --accent-fg: #fff;
+        --disabled: #bdc1c6;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #202124;
+          --fg: #e8eaed;
+          --muted: #9aa0a6;
+          --line: #3c4043;
+          --field: #292a2d;
+          --accent: #8ab4f8;
+          --accent-fg: #202124;
+          --disabled: #5f6368;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 260px;
+        margin: 0;
+        padding: 16px;
+        font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .head img { width: 20px; height: 20px; border-radius: 5px; }
+      .head span { font-size: 14px; font-weight: 600; }
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--field);
+        color: var(--fg);
+        font: inherit;
+      }
+      select:disabled { color: var(--muted); }
+      .player {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        margin: 18px 0;
+      }
+      #toggle {
+        width: 56px;
+        height: 56px;
+        border: none;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-fg);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #toggle:hover:not(:disabled) { filter: brightness(1.08); }
+      #toggle:disabled { background: var(--disabled); cursor: default; }
+      #toggle svg { width: 22px; height: 22px; fill: currentColor; }
+      #stateLabel { color: var(--muted); font-size: 12px; }
+      .volume {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+      }
+      .volume svg { width: 16px; height: 16px; fill: var(--muted); flex: none; }
+      #volume { flex: 1; min-width: 0; accent-color: var(--accent); }
+      #volumeValue {
+        min-width: 34px;
+        text-align: right;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      #status {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      #status:empty { display: none; }
+      #hint { display: block; margin-top: 2px; }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <img src="icons/icon32.png" alt="">
+      <span>Meet Music</span>
+    </div>
+
+    <select id="track" disabled aria-label="Track"></select>
+
+    <div class="player">
+      <button id="toggle" type="button" disabled aria-label="Play">
+        <svg id="iconPlay" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5v14l11-7z"></path>
+        </svg>
+        <svg id="iconPause" viewBox="0 0 24 24" aria-hidden="true" hidden>
+          <path d="M6 5h4v14H6zm8 0h4v14h-4z"></path>
+        </svg>
+      </button>
+      <span id="stateLabel">Paused</span>
+    </div>
+
+    <div class="volume">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3v2a7 7 0 0 1 0 14v2a9 9 0 0 0 0-18z"></path>
+      </svg>
+      <input id="volume" type="range" min="0" max="100" value="100" disabled aria-label="Music volume">
+      <span id="volumeValue">100%</span>
+    </div>
+
+    <p id="status"></p>
+
+    <script src="tracks.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
