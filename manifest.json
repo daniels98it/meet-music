@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Meet Music",
-  "version": "0.2.0",
-  "description": "Mix a looping MP3 into your microphone on Google Meet.",
+  "version": "0.3.0",
+  "description": "Play music and sound effects into your microphone on Google Meet.",
   "minimum_chrome_version": "111",
   "permissions": ["storage", "scripting"],
   "host_permissions": ["https://meet.google.com/*"],

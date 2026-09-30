@@ -10,10 +10,11 @@
         --fg: #202124;
         --muted: #5f6368;
         --line: #dadce0;
-        --field: #fff;
         --accent: #1a73e8;
-        --accent-fg: #fff;
-        --disabled: #bdc1c6;
+        --bezel-hi: #4a4d52;
+        --bezel: #2c2e31;
+        --bezel-lo: #161719;
+        --bezel-rim: #62666c;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -21,10 +22,11 @@
           --fg: #e8eaed;
           --muted: #9aa0a6;
           --line: #3c4043;
-          --field: #292a2d;
           --accent: #8ab4f8;
-          --accent-fg: #202124;
-          --disabled: #5f6368;
+          --bezel-hi: #686c72;
+          --bezel: #45484d;
+          --bezel-lo: #2a2c2f;
+          --bezel-rim: #82878d;
         }
       }
       * { box-sizing: border-box; }
@@ -40,43 +42,63 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 14px;
+        margin-bottom: 18px;
       }
       .head img { width: 20px; height: 20px; border-radius: 5px; }
       .head span { font-size: 14px; font-weight: 600; }
-      select {
-        width: 100%;
-        padding: 8px 10px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--field);
-        color: var(--fg);
-        font: inherit;
+      .pads {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px 8px;
+        margin-bottom: 18px;
       }
-      select:disabled { color: var(--muted); }
-      .player {
+      .pad {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
-        margin: 18px 0;
-      }
-      #toggle {
-        width: 56px;
-        height: 56px;
+        gap: 6px;
+        padding: 0;
         border: none;
-        border-radius: 50%;
-        background: var(--accent);
-        color: var(--accent-fg);
+        background: none;
+        color: var(--fg);
+        font: inherit;
         cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
       }
-      #toggle:hover:not(:disabled) { filter: brightness(1.08); }
-      #toggle:disabled { background: var(--disabled); cursor: default; }
-      #toggle svg { width: 22px; height: 22px; fill: currentColor; }
-      #stateLabel { color: var(--muted); font-size: 12px; }
+      .pad:focus-visible { outline: none; }
+      .pad:focus-visible .btn { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+      /* The button is drawn from the front and slightly above: a housing with
+         a red cap standing in its well. The cap sinks into the well when pressed. */
+      .btn { display: block; width: 64px; height: 46px; overflow: visible; transition: filter 90ms; }
+      .pad:hover .btn { filter: brightness(1.06); }
+      .floor { fill: #000; opacity: 0.22; }
+      .bezel-top { stroke: var(--bezel-rim); stroke-width: 0.8; }
+      .well { fill: #0e0e0f; }
+      .cap { transition: transform 80ms ease-out; }
+      /* popup.js holds .hit for a moment, since :active flickers past on a quick click. */
+      .pad:active .cap,
+      .pad.hit .cap { transform: translateY(6px); }
+      .cap-side { fill: url(#capSide); }
+      .cap-top { fill: url(#capTop); stroke: rgb(255 255 255 / 0.3); stroke-width: 0.6; }
+      .shine { fill: #fff; opacity: 0.35; }
+      .glyph { display: none; fill: #fff; }
+      .pad[data-state="playing"] .icon-pause,
+      .pad[data-state="paused"] .icon-play { display: inline; }
+      /* Playing lights the cap up. */
+      .glow { fill: #ff3b2f; opacity: 0; }
+      .pad[data-state="playing"] .cap-side { fill: url(#capSideLit); }
+      .pad[data-state="playing"] .cap-top { fill: url(#capTopLit); }
+      .pad[data-state="playing"] .glow { animation: glow 0.6s ease-in-out infinite alternate; }
+      @keyframes glow {
+        from { opacity: 0.35; }
+        to { opacity: 0.9; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .pad[data-state="playing"] .glow { animation: none; opacity: 0.7; }
+      }
+      .pad:disabled { color: var(--muted); cursor: default; }
+      .pad:disabled .btn { filter: grayscale(1) opacity(0.45); }
+      .name { font-size: 12px; line-height: 1.25; text-align: center; }
+      .defs { position: absolute; width: 0; height: 0; }
       .volume {
         display: flex;
         align-items: center;
@@ -102,30 +124,86 @@
     </style>
   </head>
   <body>
+    <!-- Shared by every button's SVG, so the ids exist once. Not display:none:
+         Chrome then drops the gradients. -->
+    <svg class="defs" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="capSide" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#7d140f"></stop>
+          <stop offset="0.3" stop-color="#d3302a"></stop>
+          <stop offset="0.55" stop-color="#c02721"></stop>
+          <stop offset="1" stop-color="#6e110d"></stop>
+        </linearGradient>
+        <radialGradient id="capTop" cx="0.45" cy="0.35" r="0.75">
+          <stop offset="0" stop-color="#ff7b6e"></stop>
+          <stop offset="0.6" stop-color="#e8382d"></stop>
+          <stop offset="1" stop-color="#c3241c"></stop>
+        </radialGradient>
+        <linearGradient id="capSideLit" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#b3241c"></stop>
+          <stop offset="0.3" stop-color="#ff5243"></stop>
+          <stop offset="0.55" stop-color="#f23d30"></stop>
+          <stop offset="1" stop-color="#a11f18"></stop>
+        </linearGradient>
+        <radialGradient id="capTopLit" cx="0.5" cy="0.45" r="0.7">
+          <stop offset="0" stop-color="#fff1ea"></stop>
+          <stop offset="0.35" stop-color="#ff8a74"></stop>
+          <stop offset="1" stop-color="#ff4535"></stop>
+        </radialGradient>
+        <linearGradient id="bezelTop" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" style="stop-color: var(--bezel-hi)"></stop>
+          <stop offset="1" style="stop-color: var(--bezel)"></stop>
+        </linearGradient>
+        <linearGradient id="bezelSide" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" style="stop-color: var(--bezel-lo)"></stop>
+          <stop offset="0.35" style="stop-color: var(--bezel)"></stop>
+          <stop offset="1" style="stop-color: var(--bezel-lo)"></stop>
+        </linearGradient>
+        <!-- Hides whatever of the cap is below the front lip of the well. -->
+        <clipPath id="capWell">
+          <path d="M-20 -20 H84 V35.5 H55 A23 8.4 0 0 1 9 35.5 H-20 Z"></path>
+        </clipPath>
+        <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3"></feGaussianBlur>
+        </filter>
+      </defs>
+    </svg>
+
     <div class="head">
       <img src="icons/icon32.png" alt="">
       <span>Meet Music</span>
     </div>
 
-    <select id="track" disabled aria-label="Track"></select>
+    <div id="pads" class="pads"></div>
 
-    <div class="player">
-      <button id="toggle" type="button" disabled aria-label="Play">
-        <svg id="iconPlay" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M8 5v14l11-7z"></path>
+    <template id="padTemplate">
+      <button class="pad" type="button" disabled aria-pressed="false">
+        <svg class="btn" viewBox="0 8 64 46" aria-hidden="true">
+          <ellipse class="floor" cx="32" cy="45" rx="31" ry="9" filter="url(#blur)"></ellipse>
+          <path d="M2 36 V41 A30 11 0 0 0 62 41 V36 A30 11 0 0 1 2 36 Z" fill="url(#bezelSide)"></path>
+          <ellipse class="bezel-top" cx="32" cy="36" rx="30" ry="11" fill="url(#bezelTop)"></ellipse>
+          <ellipse class="well" cx="32" cy="35.5" rx="23" ry="8.4"></ellipse>
+          <g clip-path="url(#capWell)">
+            <g class="cap">
+              <ellipse class="glow" cx="32" cy="25" rx="24" ry="10" filter="url(#blur)"></ellipse>
+              <path class="cap-side" d="M11 25 V46 A21 7.7 0 0 0 53 46 V25 A21 7.7 0 0 1 11 25 Z"></path>
+              <ellipse class="cap-top" cx="32" cy="25" rx="21" ry="7.7"></ellipse>
+              <ellipse class="shine" cx="25" cy="22.5" rx="7" ry="2.2"></ellipse>
+              <!-- Squashed vertically so the symbols lie flat on the cap's top face. -->
+              <path class="glyph icon-play" transform="translate(32 25) scale(1 0.5)" d="M-5 -9 L9 0 L-5 9 Z"></path>
+              <path class="glyph icon-pause" transform="translate(32 25) scale(1 0.5)" d="M-6 -9 H-2 V9 H-6 Z M2 -9 H6 V9 H2 Z"></path>
+            </g>
+          </g>
         </svg>
-        <svg id="iconPause" viewBox="0 0 24 24" aria-hidden="true" hidden>
-          <path d="M6 5h4v14H6zm8 0h4v14h-4z"></path>
-        </svg>
+        <span class="name"></span>
       </button>
-      <span id="stateLabel">Paused</span>
-    </div>
+    </template>
 
     <div class="volume">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3v2a7 7 0 0 1 0 14v2a9 9 0 0 0 0-18z"></path>
       </svg>
-      <input id="volume" type="range" min="0" max="100" value="100" disabled aria-label="Music volume">
+      <input id="volume" type="range" min="0" max="100" value="100" disabled aria-label="Volume">
       <span id="volumeValue">100%</span>
     </div>
 

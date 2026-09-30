@@ -1,22 +1,16 @@
 (() => {
-  // TRACKS and DEFAULT_TRACK come from tracks.js, loaded first in the manifest.
-  const known = (file) => TRACKS.some(t => t.file === file);
+  // TRACKS comes from tracks.js, loaded first in the manifest.
+  const find = (file) => TRACKS.find(t => t.file === file);
 
-  const state = { on: false, volume: 1, track: DEFAULT_TRACK };
+  // sounds maps a file to 'playing' or 'paused'. A file missing from it is idle.
+  const state = { volume: 1, sounds: {} };
 
   const pushVolume = () =>
     window.postMessage({ type: 'MUSIC_VOLUME', volume: state.volume }, '*');
 
-  const pushSrc = () => window.postMessage({
-    type: 'MUSIC_SRC',
-    url: chrome.runtime.getURL('music/' + state.track)
-  }, '*');
-
-  chrome.storage.local.get(['volume', 'track'], (stored) => {
+  chrome.storage.local.get(['volume'], (stored) => {
     if (typeof stored?.volume === 'number') state.volume = stored.volume;
-    if (known(stored?.track)) state.track = stored.track;
     pushVolume();
-    pushSrc();
   });
 
   // The slider fires on every drag step: push the sound immediately,
@@ -27,15 +21,37 @@
     saveTimer = setTimeout(() => chrome.storage.local.set({ volume: state.volume }), 300);
   }
 
+  // inject.js reports a sound that finished on its own (or failed to start).
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || e.data?.type !== 'MUSIC_ENDED') return;
+    if (!chrome.runtime?.id) return;  // orphaned by an extension reload
+    delete state.sounds[e.data.file];
+    // Refresh the popup if it is open. With no popup there is no receiver.
+    chrome.runtime.sendMessage({ type: 'STATE', state }).catch(() => {});
+  });
+
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg?.type === 'GET_STATE') {
       sendResponse(state);
       return;
     }
 
-    if (msg?.type === 'TOGGLE') {
-      state.on = !state.on;
-      window.postMessage({ type: 'MUSIC_TOGGLE', on: state.on }, '*');
+    // A button press plays an idle sound, pauses a playing one
+    // and resumes a paused one.
+    if (msg?.type === 'PRESS') {
+      const sound = find(msg.file);
+      if (sound && state.sounds[sound.file] === 'playing') {
+        state.sounds[sound.file] = 'paused';
+        window.postMessage({ type: 'MUSIC_PAUSE', file: sound.file }, '*');
+      } else if (sound) {
+        state.sounds[sound.file] = 'playing';
+        window.postMessage({
+          type: 'MUSIC_PLAY',
+          file: sound.file,
+          url: chrome.runtime.getURL('music/' + sound.file),
+          loop: !!sound.loop
+        }, '*');
+      }
       sendResponse(state);
       return;
     }
@@ -44,16 +60,6 @@
       state.volume = msg.volume;
       pushVolume();
       saveVolume();
-      sendResponse(state);
-      return;
-    }
-
-    if (msg?.type === 'TRACK') {
-      if (known(msg.file)) {
-        state.track = msg.file;
-        chrome.storage.local.set({ track: state.track });
-        pushSrc();
-      }
       sendResponse(state);
     }
   });
