@@ -1,32 +1,36 @@
 // TRACKS comes from tracks.js, loaded first in popup.html.
-const trackSelect = document.getElementById('track');
-const toggle = document.getElementById('toggle');
-const iconPlay = document.getElementById('iconPlay');
-const iconPause = document.getElementById('iconPause');
-const stateLabel = document.getElementById('stateLabel');
+const pads = document.getElementById('pads');
+const padTemplate = document.getElementById('padTemplate');
 const volume = document.getElementById('volume');
 const volumeValue = document.getElementById('volumeValue');
 const statusEl = document.getElementById('status');  // not `status`: that shadows window.status
 
 let tabId = null;
 
+const buttons = new Map();  // file -> its button
 for (const t of TRACKS) {
-  const opt = document.createElement('option');
-  opt.value = t.file;
-  opt.textContent = t.label;
-  trackSelect.appendChild(opt);
+  const btn = padTemplate.content.firstElementChild.cloneNode(true);
+  btn.querySelector('.name').textContent = t.label;
+  let hitTimer = null;
+  btn.addEventListener('click', () => {
+    btn.classList.add('hit');
+    clearTimeout(hitTimer);
+    hitTimer = setTimeout(() => btn.classList.remove('hit'), 150);
+    send({ type: 'PRESS', file: t.file });
+  });
+  buttons.set(t.file, btn);
+  pads.appendChild(btn);
 }
 
 function render(state) {
-  trackSelect.value = state.track;
-  iconPlay.hidden = state.on;
-  iconPause.hidden = !state.on;
-  toggle.setAttribute('aria-label', state.on ? 'Pause' : 'Play');
-  stateLabel.textContent = state.on ? 'Playing' : 'Paused';
+  for (const [file, btn] of buttons) {
+    const playState = state.sounds[file] || 'idle';  // or 'playing', 'paused'
+    btn.dataset.state = playState;
+    btn.setAttribute('aria-pressed', String(playState === 'playing'));
+    btn.disabled = false;
+  }
   volume.value = Math.round(state.volume * 100);
   volumeValue.textContent = volume.value + '%';
-  trackSelect.disabled = false;
-  toggle.disabled = false;
   volume.disabled = false;
   statusEl.textContent = '';
 }
@@ -34,8 +38,7 @@ function render(state) {
 const MEET_URL = 'https://meet.google.com/';
 
 function unavailable(message, hintText) {
-  trackSelect.disabled = true;
-  toggle.disabled = true;
+  for (const btn of buttons.values()) btn.disabled = true;
   volume.disabled = true;
   statusEl.textContent = message;
   if (hintText) {
@@ -85,11 +88,10 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   });
 });
 
-toggle.addEventListener('click', () => send({ type: 'TOGGLE' }));
-
-trackSelect.addEventListener('change', () =>
-  send({ type: 'TRACK', file: trackSelect.value })
-);
+// content.js pushes the state when a sound finishes while the popup is open.
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg?.type === 'STATE' && sender.tab?.id === tabId) render(msg.state);
+});
 
 volume.addEventListener('input', () => {
   volumeValue.textContent = volume.value + '%';

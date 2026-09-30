@@ -6,27 +6,37 @@
   const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   const CALL_BASE = 0.15;   // what the meeting hears
   const LOCAL_BASE = 0.35;  // what you hear
-  let ctx, mix, el, callGain, localGain;
+  let ctx, mix, callGain, localGain;
   let volume = 1;
-  let srcUrl = null;  // content.js sends this over MUSIC_SRC
-  let playing = false;
+  const players = new Map();  // file -> its Audio element, made on first play
 
   function build() {
     if (ctx) return;
     ctx = new AudioContext();
     mix = ctx.createMediaStreamDestination();
 
-    el = new Audio();
-    el.crossOrigin = 'anonymous';  // extension URL is cross-origin to meet.google.com
-    if (srcUrl) el.src = srcUrl;   // may not have arrived yet; MUSIC_SRC fills it in
-    el.loop = true;
-    const src = ctx.createMediaElementSource(el);
-
     callGain = ctx.createGain();  callGain.gain.value  = CALL_BASE * volume;
     localGain = ctx.createGain(); localGain.gain.value = LOCAL_BASE * volume;
 
-    src.connect(callGain).connect(mix);              // -> the call
-    src.connect(localGain).connect(ctx.destination); // -> your speakers
+    callGain.connect(mix);              // -> the call
+    localGain.connect(ctx.destination); // -> your speakers
+  }
+
+  const ended = (file) => window.postMessage({ type: 'MUSIC_ENDED', file }, '*');
+
+  // Every sound feeds the same two gains, so several can play at once.
+  function player(file, url) {
+    let el = players.get(file);
+    if (el) return el;
+    el = new Audio();
+    el.crossOrigin = 'anonymous';  // extension URL is cross-origin to meet.google.com
+    el.src = url;
+    el.addEventListener('ended', () => ended(file));
+    const src = ctx.createMediaElementSource(el);
+    src.connect(callGain);
+    src.connect(localGain);
+    players.set(file, el);
+    return el;
   }
 
   async function patched(c) {
@@ -50,19 +60,8 @@
   MediaDevices.prototype.getUserMedia = patched;
   console.info('[meet-music] getUserMedia patched');
 
-  const play = () => el.play().catch(err => console.warn('[meet-music]', err));
-
   window.addEventListener('message', (e) => {
     if (e.source !== window) return;
-
-    if (e.data?.type === 'MUSIC_SRC') {
-      srcUrl = e.data.url;
-      if (el) {
-        el.src = srcUrl;
-        if (playing) play();  // switching tracks mid-call keeps playing
-      }
-      return;
-    }
 
     if (e.data?.type === 'MUSIC_VOLUME') {
       volume = e.data.volume;
@@ -73,15 +72,22 @@
       return;
     }
 
-    if (e.data?.type !== 'MUSIC_TOGGLE') return;
-    if (!srcUrl) {
-      console.warn('[meet-music] no track selected yet');
+    if (e.data?.type === 'MUSIC_PAUSE') {
+      players.get(e.data.file)?.pause();
       return;
     }
+
+    if (e.data?.type !== 'MUSIC_PLAY') return;
+    const { file } = e.data;
     build();
-    if (!el.src) el.src = srcUrl;
-    ctx.resume();                       // needs the user gesture
-    playing = e.data.on;
-    playing ? play() : el.pause();
+    ctx.resume();  // needs the user gesture
+    const el = player(file, e.data.url);
+    el.loop = e.data.loop;
+    // play() resumes a paused sound and restarts one that has ended.
+    el.play().catch((err) => {
+      if (err.name === 'AbortError') return;  // a pause() beat it; state already says so
+      console.warn('[meet-music]', err);
+      ended(file);  // so the button does not stay lit for a sound that never started
+    });
   });
 })();
